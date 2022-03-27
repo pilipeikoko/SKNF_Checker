@@ -33,5 +33,15 @@ namespace SKNF_Checker
 
             return line;
         }
+
+        public static string RemoveNegative(this string line)
+        {
+            if (line[0] == '!')
+            {
+                line = line[1..];
+            }
+
+            return line;
+        }
     }
 }
