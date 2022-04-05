@@ -1,23 +1,25 @@
 ﻿////////////////////////////////////////////
-//Лабораторная работа №1 по дисциплине ЛОИС
+//Лабораторная работа №1-2 по дисциплине ЛОИС
 //Выполнена студентами группы 921701
 //Пилипейко Валентин Игоревич
 //Драгун Владмир Андреевич
 //24.02.2022 - Написание кода Лабораторной работы №1
 //24.03.2022 - Написание кода Лабораторной работы №2
+//Построить СКНФ для заданной формулы языка логики высказываний
 //Использованные источники: 
 //1) Справочно проверяющая семантическая система по дисциплине ЛОИС
 //   Сслыка: http://scnedu.sourceforge.net/variety/_/index.html?variety=examinator.PSMIS.E.1.json
 
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Text;
 
 namespace SKNF_Checker
 {
-    class Program
+    public class SknfGenerator
     {
         private static bool IsNumericUnaryOperation(string line)
         {
@@ -42,44 +44,12 @@ namespace SKNF_Checker
                 line = line[1..];
             }
 
-            if (line.Length == 1 && char.IsLetter(line[0]))
+            if (line.Length == 1 && (char.IsLetter(line[0]) || line[0] == '0' || line[0] == '1'))
             {
                 return true;
             }
 
             return false;
-
-            // if (!char.IsLetter(line[0]))
-            // {
-            //     return false;
-            // }
-            // else
-            // {
-            //     line = line[1..];
-            //     if (string.IsNullOrEmpty(line))
-            //     {
-            //         return true;
-            //     }
-            // }
-            //
-            // if (!char.IsDigit(line[0]) || line[0] == '0')
-            // {
-            //     return false;
-            // }
-            // else
-            // {
-            //     line = line[1..];
-            // }
-            //
-            // for (int i = 0; i < line.Length; ++i)
-            // {
-            //     if (!char.IsDigit(line[i]))
-            //     {
-            //         return false;
-            //     }
-            // }
-            //
-            // return true;
         }
 
         // Метод разработал Пилипейко Валентин при поддержке Владимира Драгуна
@@ -342,21 +312,19 @@ namespace SKNF_Checker
 
 
         // Метод разработал Пилипейко Валентин
-        public static string GenerateSknf(string formula)
+        public static string GeneratePcnf(string formula)
         {
             try
             {
                 EnsureFormulaCorrent(formula);
 
-                List<string> operands = new List<string>();
-
-                GetFormulaOperands(formula, ref operands);
+                if (IsUnaryOperation(formula.TryRemoveBrackets()))
+                {
+                    return formula;
+                }
 
                 //Only unique operands 
-                operands = operands.Select(x => x.RemoveNegative())
-                    .GroupBy(x => x)
-                    .Select(x => x.Key)
-                    .ToList();
+                List<string> operands = GetUniqueOperands(formula);
 
                 List<List<int>> truthTable = GenerateTruthTable(operands.Count);
 
@@ -364,6 +332,10 @@ namespace SKNF_Checker
 
                 for (int i = 0; i < truthTable.Count; ++i)
                 {
+                    //if (i % 1000 == 0)
+                    //{
+                    //    Console.Write(i);
+                    //}
                     string currentFormula = PrepareFormula(formula, operands, truthTable[i]);
 
                     if (!IsTruthTableLineTrue(currentFormula))
@@ -380,12 +352,28 @@ namespace SKNF_Checker
             }
         }
 
+        private static List<string> GetUniqueOperands(string formula)
+        {
+            List<string> operands = new List<string>();
+
+            GetFormulaOperands(formula, ref operands);
+
+            return operands.Select(x => x.RemoveNegative())
+                .GroupBy(x => x)
+                .Select(x => x.Key)
+                .Where(x => (x[0] != '1' && x[0] != '0'))
+                .ToList();
+        }
+
         // Метод разработал Пилипейко Валентин
         private static string GenerateResult(List<string> operands, List<List<int>> formulas)
         {
             StringBuilder result = new StringBuilder();
 
-            result.Append("(");
+            if (operands.Count > 1)
+            {
+                result.Append("(");
+            }
 
             for (int i = 0; i < formulas.Count; ++i)
             {
@@ -415,7 +403,15 @@ namespace SKNF_Checker
                 }
             }
 
-            result.Append(")");
+            if (operands.Count > 1)
+            {
+                result.Append(")");
+            }
+
+            if (result.ToString() == string.Empty)
+            {
+                result.Append("Doesn't exist");
+            }
 
             return result.ToString();
         }
@@ -440,6 +436,7 @@ namespace SKNF_Checker
             {
                 case "->":
                 {
+                    //return IsTruthTableLineTrue(leftSubFormula) ? IsTruthTableLineTrue(rightSubFormula) : true;
                     bool leftResult = IsTruthTableLineTrue(leftSubFormula);
 
                     if (!leftResult)
@@ -525,6 +522,7 @@ namespace SKNF_Checker
 
             for (int i = 0; i < size; ++i)
             {
+
                 var tempList = Enumerable.Repeat(0, operandsCount).ToList();
 
                 string currentNumber = Convert.ToString(i, 2);
@@ -569,13 +567,32 @@ namespace SKNF_Checker
         // Метод разработал Пилипейко Валентин
         static void Main(string[] args)
         {
-            string[] lines =
-                File.ReadAllLines(@"c:\users\pilip\source\repos\SKNF_Checker\input_lab2.txt", Encoding.UTF8);
-            foreach (var line in lines)
+            Stopwatch sw = new Stopwatch();
+            sw.Start();
+            GenerateTruthTable(1);
+            sw.Stop();
+            var firstTimeItTook = sw.Elapsed;
+            Console.WriteLine(firstTimeItTook);
+            for (int i = 2; i <= 25; i++)
             {
-                var result = GenerateSknf(line);
-                Console.WriteLine(line + "      " + result);
+                sw.Start();
+                GenerateTruthTable(i);
+                sw.Stop();
+                TimeSpan timeItTook = sw.Elapsed;
+
+               // Console.WriteLine(i + "A"+ timeItTook.Milliseconds);
+
+                Console.WriteLine(timeItTook.TotalMilliseconds/ firstTimeItTook.TotalMilliseconds);
             }
+
+            //string[] lines =
+            //    File.ReadAllLines(@"c:\users\pilip\source\repos\SKNF_Checker\input_lab2.txt", Encoding.UTF8);
+
+            //foreach (var line in lines)
+            //{
+            //    var result = GenerateSknf(line);
+            //    Console.WriteLine(line + "      " + result);
+            //}
         }
     }
 }
